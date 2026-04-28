@@ -29,7 +29,6 @@ Thumbs.db
 secura-report.json
 test-mcp.json
 test-mcp.sh
-examples/
 
 # Agent instructions (private)
 AGENTS.md

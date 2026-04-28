@@ -29,6 +29,32 @@ const COMPOSITE_RULES = [
   },
 ]
 
+function detectMultiMatch(findings) {
+  const byFile = {}
+  for (const f of findings) {
+    const file = f.file || f.package || "unknown"
+    if (!byFile[file]) byFile[file] = []
+    byFile[file].push(f.patternId)
+  }
+
+  const multiMatches = []
+  for (const [file, patternIds] of Object.entries(byFile)) {
+    const uniquePatterns = new Set(patternIds)
+    if (uniquePatterns.size >= 3) {
+      multiMatches.push({
+        id: "multi-pattern-file",
+        file,
+        patterns: Array.from(uniquePatterns),
+        severity: "high",
+        bonus: 10,
+        description: `Archivo con ${uniquePatterns.size} patrones sospechosos: ${Array.from(uniquePatterns).join(", ")}`,
+      })
+    }
+  }
+
+  return multiMatches
+}
+
 function detectComposites(findings) {
   const foundIds = new Set(findings.map(f => f.patternId))
   const composites = []
@@ -45,6 +71,11 @@ function detectComposites(findings) {
         signals: rule.signals,
       })
     }
+  }
+
+  const multiMatches = detectMultiMatch(findings)
+  for (const mm of multiMatches) {
+    composites.push(mm)
   }
 
   return composites

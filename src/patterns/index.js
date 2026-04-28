@@ -11,6 +11,12 @@ const CONFIDENCE_MULTIPLIERS = {
   high: 1.5,
 }
 
+const PATTERN_TYPES = {
+  strong: 1.0,    // Finding directo, afecta score normalmente
+  weak: 0.5,     // Bajo peso
+  contextual: 0.25, // Solo contexto, no hallazgos crítico
+}
+
 const RISK_THRESHOLDS = {
   low: 0,
   medium: 20,
@@ -21,7 +27,8 @@ const RISK_THRESHOLDS = {
 function calculateFindingScore(finding) {
   const severityScore = SEVERITY_SCORES[finding.severity] || 0
   const confidenceMult = CONFIDENCE_MULTIPLIERS[finding.confidence || "medium"] || 1
-  return severityScore * confidenceMult
+  const typeMult = PATTERN_TYPES[finding.type || "strong"] || 1
+  return severityScore * confidenceMult * typeMult
 }
 
 function getRiskLevel(score) {
@@ -31,7 +38,7 @@ function getRiskLevel(score) {
   return "LOW"
 }
 
-export { SEVERITY_SCORES, CONFIDENCE_MULTIPLIERS, RISK_THRESHOLDS, calculateFindingScore, getRiskLevel }
+export { SEVERITY_SCORES, CONFIDENCE_MULTIPLIERS, PATTERN_TYPES, RISK_THRESHOLDS, calculateFindingScore, getRiskLevel }
 
 export const patterns = [
   {
@@ -264,8 +271,9 @@ export const patterns = [
   },
   {
     id: "database-connection",
-    severity: "medium",
+    severity: "low",
     confidence: "low",
+    type: "contextual",
     category: "credentials",
     description: "Conexión a base de datos",
     regex: /new\s+(require\(['"]pg['"]\)|require\(['"]mysql['"]\)|require\(['"]mongodb['"]\)|require\(['"]ioredis['"]\))/,
@@ -286,11 +294,12 @@ export const patterns = [
     id: "download-execute",
     severity: "critical",
     confidence: "high",
+    type: "strong",
     category: "malware",
     description: "Descarga y ejecución de código",
-    regex: /https?\.get\(.*\)\.pipe\(.*exec\)|curl.*\|\s*(bash|sh|node)/,
+    regex: /https?:\/\/.*\.pipe|curl.*\|\s*(bash|sh|node)/,
     explanation:
-      "Descarga contenido de internet y lo ejecuta inmediatamente.",
+      "Descarga contenido de internet y lo ejecuta inmediatamente. Véase también shell-pipe.",
   },
   {
     id: "bashrc-modification",
@@ -436,6 +445,7 @@ export const patterns = [
     id: "template-literal-obf",
     severity: "low",
     confidence: "low",
+    type: "weak",
     category: "obfuscation",
     description: "Template literal con expresiones dinámicas",
     regex: /`(?:(?!\$\{).)*\$\{[^}]+\}.*`/,
@@ -444,13 +454,14 @@ export const patterns = [
   },
   {
     id: "typosquat-suspicious",
-    severity: "medium",
+    severity: "low",
     confidence: "low",
+    type: "contextual",
     category: "malware",
     description: "Paquete con nombre similar a popular",
     regex: /(lodash|moment|axios|express|react|vue|npm).*\-/,
     explanation:
-      "Paquete con nombre similar a popular (typosquatting).",
+      "Paquete con nombre similar a popular (typosquatting). Revisar manualmente.",
   },
 ];
 
