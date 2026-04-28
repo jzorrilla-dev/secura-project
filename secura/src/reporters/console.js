@@ -1,11 +1,19 @@
 import chalk from "chalk";
 import { writeFileSync, existsSync } from "fs";
+import { calculateProjectScore, getRiskLevel } from "../core/scorer.js";
 
 const SEVERITY_CONFIG = {
   critical: { icon: "☠️", label: "CRÍTICO", color: chalk.red.bold.underline },
   high: { icon: "🔴", label: "ALTO", color: chalk.red.bold },
   medium: { icon: "⚠️ ", label: "MEDIO", color: chalk.yellow.bold },
   low: { icon: "🔵", label: "BAJO", color: chalk.blue },
+};
+
+const RISK_CONFIG = {
+  CRITICAL: { icon: "☠️", color: chalk.red.bold.underline },
+  HIGH: { icon: "🔴", color: chalk.red.bold },
+  MEDIUM: { icon: "⚠️ ", color: chalk.yellow.bold },
+  LOW: { icon: "🔵", color: chalk.blue },
 };
 
 const CATEGORY_LABELS = {
@@ -99,55 +107,72 @@ export function printAIAnalysis(analysis) {
   }
 }
 
-export function printSummary(allFindings, duration) {
-  const critical = allFindings.filter((f) => f.severity === "critical").length;
-  const high = allFindings.filter((f) => f.severity === "high").length;
-  const medium = allFindings.filter((f) => f.severity === "medium").length;
-  const low = allFindings.filter((f) => f.severity === "low").length;
+export function printSummary(allFindings, duration, includeScore = true) {
+  const scored = includeScore ? calculateProjectScore(allFindings) : null
 
-  console.log(chalk.cyan("\n\n▶ Resumen"));
-  console.log(chalk.gray("─".repeat(60)));
+  const critical = allFindings.filter((f) => f.severity === "critical").length
+  const high = allFindings.filter((f) => f.severity === "high").length
+  const medium = allFindings.filter((f) => f.severity === "medium").length
+  const low = allFindings.filter((f) => f.severity === "low").length
+
+  console.log(chalk.cyan("\n\n▶ Resumen"))
+  console.log(chalk.gray("─".repeat(60)))
+
+  if (includeScore && scored) {
+    const riskCfg = RISK_CONFIG[scored.riskLevel]
+    console.log(
+      `  ${chalk.white("Riesgo:")} ${riskCfg.color(`${riskCfg.icon} ${scored.riskLevel}`)}  ` +
+      `${chalk.white("Score:")} ${chalk.bold(scored.totalScore)}`
+    )
+  }
+
   console.log(
     `  ${chalk.red.bold.underline(`☠️ Crítico: ${critical}`)}   ` +
     `${chalk.red.bold(`🔴 Alto: ${high}`)}   ` +
     `${chalk.yellow.bold(`⚠️  Medio: ${medium}`)}   ` +
     `${chalk.blue(`🔵 Bajo: ${low}`)}`
-  );
-  console.log(chalk.gray(`\n  Tiempo: ${duration}ms`));
+  )
+  console.log(chalk.gray(`\n  Tiempo: ${duration}ms`))
 
-  if (critical > 0) {
+  if (scored && scored.riskLevel !== "LOW") {
+    const riskCfg = RISK_CONFIG[scored.riskLevel]
     console.log(
-      chalk.red.bold.underline("\n  ☠️  CRÍTICO: Hallazgos extremadamente graves detectados.")
-    );
-  } else if (high > 0) {
-    console.log(
-      chalk.red.bold("\n  ⛔ Se encontraron hallazgos de severidad ALTA.")
-    );
-  } else if (medium > 0) {
-    console.log(chalk.yellow("\n  ⚠️  Se encontraron hallazgos de severidad media."));
-  } else if (low > 0) {
-    console.log(chalk.blue("\n  🔵 Solo hallazgos de baja severidad."));
-  } else {
-    console.log(chalk.green.bold("\n  ✅ ¡Todo limpio!"));
+      riskCfg.color(`\n  ${riskCfg.icon} ${scored.riskLevel}: `) +
+      getRiskMessage(scored.riskLevel)
+    )
+  } else if (!scored || allFindings.length === 0) {
+    console.log(chalk.green.bold("\n  ✅ ¡Todo limpio!"))
   }
 
-  console.log();
+  console.log()
+
+  return scored
+}
+
+function getRiskMessage(riskLevel) {
+  const messages = {
+    CRITICAL: "Hallazgos extremadamente graves detectados. Revisar inmediatamente.",
+    HIGH: "Hallazgos graves detectados. Priorizar corrección.",
+    MEDIUM: "Hallazgos de severidad media detectados.",
+    LOW: "Solo hallazgos menores o sin hallazgos.",
+  }
+  return messages[riskLevel] || ""
 }
 
 export function exportJSON(allFindings, outputPath) {
+  const scored = calculateProjectScore(allFindings)
+
   const report = {
     generatedAt: new Date().toISOString(),
     totalFindings: allFindings.length,
-    bySeverity: {
-      critical: allFindings.filter((f) => f.severity === "critical").length,
-      high: allFindings.filter((f) => f.severity === "high").length,
-      medium: allFindings.filter((f) => f.severity === "medium").length,
-      low: allFindings.filter((f) => f.severity === "low").length,
-    },
+    score: scored.totalScore,
+    riskLevel: scored.riskLevel,
+    bySeverity: scored.bySeverity,
+    byCategory: scored.byCategory,
     findings: allFindings,
-  };
-  writeFileSync(outputPath, JSON.stringify(report, null, 2));
-  console.log(chalk.gray(`\n  📄 Reporte exportado a: ${outputPath}`));
+  }
+  writeFileSync(outputPath, JSON.stringify(report, null, 2))
+  console.log(chalk.gray(`\n  📄 Reporte exportado a: ${outputPath}`))
 }
 
 export function printEnvironmentAudit(audit) {

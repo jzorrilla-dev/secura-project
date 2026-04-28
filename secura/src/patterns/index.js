@@ -1,8 +1,43 @@
+const SEVERITY_SCORES = {
+  low: 1,
+  medium: 3,
+  high: 7,
+  critical: 10,
+}
+
+const CONFIDENCE_MULTIPLIERS = {
+  low: 0.5,
+  medium: 1,
+  high: 1.5,
+}
+
+const RISK_THRESHOLDS = {
+  low: 0,
+  medium: 20,
+  high: 50,
+  critical: 100,
+}
+
+function calculateFindingScore(finding) {
+  const severityScore = SEVERITY_SCORES[finding.severity] || 0
+  const confidenceMult = CONFIDENCE_MULTIPLIERS[finding.confidence || "medium"] || 1
+  return severityScore * confidenceMult
+}
+
+function getRiskLevel(score) {
+  if (score >= RISK_THRESHOLDS.critical) return "CRITICAL"
+  if (score >= RISK_THRESHOLDS.high) return "HIGH"
+  if (score >= RISK_THRESHOLDS.medium) return "MEDIUM"
+  return "LOW"
+}
+
+export { SEVERITY_SCORES, CONFIDENCE_MULTIPLIERS, RISK_THRESHOLDS, calculateFindingScore, getRiskLevel }
+
 export const patterns = [
-  // — EJECUCIÓN DE CÓDIGO —
   {
     id: "eval-obfuscated",
     severity: "high",
+    confidence: "high",
     category: "code-execution",
     description: "eval() ejecutando contenido codificado en base64",
     regex: /eval\s*\(\s*(Buffer\.from|atob)\s*\(/,
@@ -12,6 +47,7 @@ export const patterns = [
   {
     id: "eval-plain",
     severity: "medium",
+    confidence: "low",
     category: "code-execution",
     description: "eval() con variable o expresión dinámica",
     regex: /eval\s*\(\s*(?!['"`])/,
@@ -21,6 +57,7 @@ export const patterns = [
   {
     id: "new-function",
     severity: "medium",
+    confidence: "medium",
     category: "code-execution",
     description: "new Function() para ejecución dinámica de código",
     regex: /new\s+Function\s*\(/,
@@ -29,15 +66,16 @@ export const patterns = [
   {
     id: "vm-run-context",
     severity: "medium",
+    confidence: "medium",
     category: "code-execution",
     description: "vm.runInThisContext() o vm.runInNewContext()",
     regex: /vm\.run(InThisContext|InNewContext|InContext)\s*\(/,
     explanation: "Ejecuta código en el contexto de Node. Puede bypassear protecciones.",
   },
-  // — EXFILTRACIÓN DE DATOS —
   {
     id: "ssh-key-access",
     severity: "high",
+    confidence: "high",
     category: "data-exfiltration",
     description: "Acceso a claves SSH del usuario",
     regex: /['"](\.ssh|id_rsa|id_ed25519|known_hosts|authorized_keys)['"]/,
@@ -47,6 +85,7 @@ export const patterns = [
   {
     id: "env-file-access",
     severity: "high",
+    confidence: "medium",
     category: "data-exfiltration",
     description: "Lectura directa de archivos .env",
     regex: /readFile(Sync)?\s*\([^)]*['"]\.env['"]/,
@@ -56,6 +95,7 @@ export const patterns = [
   {
     id: "process-env-exfil",
     severity: "medium",
+    confidence: "medium",
     category: "data-exfiltration",
     description: "process.env completo enviado a red",
     regex: /JSON\.stringify\s*\(\s*process\.env\s*\)/,
@@ -65,6 +105,7 @@ export const patterns = [
   {
     id: "home-dir-access",
     severity: "medium",
+    confidence: "low",
     category: "data-exfiltration",
     description: "Acceso al directorio home del usuario",
     regex: /(os\.homedir\(\)|process\.env\.HOME|~\/)/,
@@ -74,6 +115,7 @@ export const patterns = [
   {
     id: "git-credentials-access",
     severity: "high",
+    confidence: "high",
     category: "data-exfiltration",
     description: "Acceso a credenciales de Git",
     regex: /\.git-credentials|git[_-]credentials/,
@@ -83,16 +125,17 @@ export const patterns = [
   {
     id: "npm-config-access",
     severity: "high",
+    confidence: "medium",
     category: "data-exfiltration",
     description: "Acceso a configuración de npm (tokens)",
     regex: /process\.env\.npm_config_|process\.env\./,
     explanation:
       "Acceso a tokens de npm o variables de configuración.",
   },
-  // — RED —
   {
     id: "network-in-lifecycle",
     severity: "high",
+    confidence: "high",
     category: "network",
     description: "Solicitud de red en script de lifecycle",
     regex: /(curl|wget)\s+https?:\/\//,
@@ -102,6 +145,7 @@ export const patterns = [
   {
     id: "dns-lookup-suspicious",
     severity: "medium",
+    confidence: "low",
     category: "network",
     description: "DNS lookup hardcodeado a dominio externo",
     regex: /dns\.lookup\s*\(\s*['"][^'"]+\.[^'"]+['"]/,
@@ -111,16 +155,17 @@ export const patterns = [
   {
     id: "fetch-external",
     severity: "medium",
+    confidence: "low",
     category: "network",
     description: "fetch() o http.request() a URL hardcodeada",
     regex: /(fetch|http\.request|https\.request)\s*\(\s*['"](http|https):\/\//,
     explanation:
-      "Request a URL externa hardcodeada. En scripts de instalación es sospechoso.",
+      "Request a URL externa hardcodeada. En scripts de instalación es sospechosos.",
   },
-  // — EJECUCIÓN DE SISTEMA —
   {
     id: "child-process-exec",
     severity: "high",
+    confidence: "medium",
     category: "system-execution",
     description: "child_process.exec() con string dinámico",
     regex: /(?:exec|execSync)\s*\(\s*(?!['"`])/,
@@ -130,6 +175,7 @@ export const patterns = [
   {
     id: "shell-pipe",
     severity: "high",
+    confidence: "high",
     category: "system-execution",
     description: "Pipe de curl/wget a shell (curl | sh)",
     regex: /(curl|wget)[^|]+\|\s*(bash|sh|zsh)/,
@@ -139,6 +185,7 @@ export const patterns = [
   {
     id: "spawn-suspicious",
     severity: "medium",
+    confidence: "medium",
     category: "system-execution",
     description: "spawn() ejecutando bash/sh/powershell",
     regex: /spawn\s*\(\s*['"`](bash|sh|zsh|powershell|cmd)['"` ]/,
@@ -148,6 +195,7 @@ export const patterns = [
   {
     id: "reverse-shell",
     severity: "critical",
+    confidence: "high",
     category: "system-execution",
     description: "Patrón de reverse shell",
     regex: /(spawn|exec)\s*\([^)]*['"]\/(bin\/)?sh['"].*['"]-i['"]/,
@@ -157,16 +205,17 @@ export const patterns = [
   {
     id: "cron-job-creation",
     severity: "high",
+    confidence: "medium",
     category: "system-execution",
     description: "Creación de tareas programadas (cron)",
     regex: /(crontab|schedule|setInterval).*['"](.*\*.*){5}['"]/,
     explanation:
       "Intento de crear tareas programadas para ejecución persistente.",
   },
-  // — OFUSCACIÓN —
   {
     id: "base64-decode-exec",
     severity: "high",
+    confidence: "high",
     category: "obfuscation",
     description: "Decodificación base64 seguida de ejecución",
     regex: /(Buffer\.from|atob)\s*\([^)]+,?\s*['"]base64['"]\s*\)\.toString/,
@@ -176,6 +225,7 @@ export const patterns = [
   {
     id: "hex-string",
     severity: "low",
+    confidence: "low",
     category: "obfuscation",
     description: "String hexadecimal largo (posible payload ofuscado)",
     regex: /['"][0-9a-fA-F]{50,}['"]/,
@@ -185,16 +235,17 @@ export const patterns = [
   {
     id: "charcode-obfuscation",
     severity: "medium",
+    confidence: "medium",
     category: "obfuscation",
     description: "Construcción de strings con fromCharCode",
     regex: /String\.fromCharCode\s*\(\s*\d+(\s*,\s*\d+){5,}\s*\)/,
     explanation:
       "Construye strings caracter por caracter para evadir detección.",
   },
-  // — CREDENCIALES / KEYS —
   {
     id: "aws-keys-access",
     severity: "critical",
+    confidence: "high",
     category: "credentials",
     description: "Acceso a credenciales AWS",
     regex: /process\.env\.AWS_(SECRET|ACCESS|KEY)|AKIA[0-9A-Z]{16}/,
@@ -204,6 +255,7 @@ export const patterns = [
   {
     id: "ci-env-vars",
     severity: "high",
+    confidence: "medium",
     category: "credentials",
     description: "Acceso a variables de CI/CD",
     regex: /process\.env\.(CI_|GITHUB_|GITLAB_|CIRCLE_|TRAVIS_)/,
@@ -213,16 +265,17 @@ export const patterns = [
   {
     id: "database-connection",
     severity: "medium",
+    confidence: "low",
     category: "credentials",
     description: "Conexión a base de datos",
     regex: /new\s+(require\(['"]pg['"]\)|require\(['"]mysql['"]\)|require\(['"]mongodb['"]\)|require\(['"]ioredis['"]\))/,
     explanation:
       "Conexión a base de datos. Puede ser legítima o intento de acceso no autorizado.",
   },
-  // — CRYPTO / MINING —
   {
     id: "crypto-mining",
     severity: "medium",
+    confidence: "low",
     category: "malware",
     description: "Posible código de minería de criptomonedas",
     regex: /(setInterval|setTimeout).*(crypto|mining|pool|stratum)/,
@@ -232,11 +285,172 @@ export const patterns = [
   {
     id: "download-execute",
     severity: "critical",
+    confidence: "high",
     category: "malware",
     description: "Descarga y ejecución de código",
     regex: /https?\.get\(.*\)\.pipe\(.*exec\)|curl.*\|\s*(bash|sh|node)/,
     explanation:
       "Descarga contenido de internet y lo ejecuta inmediatamente.",
+  },
+  {
+    id: "bashrc-modification",
+    severity: "critical",
+    confidence: "high",
+    category: "system-execution",
+    description: "Modificación de shell config para persistencia",
+    regex: /(>>|>|writeFile).*(\.bashrc|\.bash_profile|\.zshrc|\.profile|\/etc\/profile)/,
+    explanation:
+      "Modifica archivos de configuración del shell para persistencia automática.",
+  },
+  {
+    id: "cron-persistence",
+    severity: "critical",
+    confidence: "medium",
+    category: "system-execution",
+    description: "Creación de tarea programada para persistencia",
+    regex: /(echo|crontab).*\*.*\*.*\*.*\*|scheduleJob|setTimeout.*cron/,
+    explanation:
+      "Crea tareas programadas para ejecutar código periódicamente.",
+  },
+  {
+    id: "systemd-service",
+    severity: "critical",
+    confidence: "high",
+    category: "system-execution",
+    description: "Creación de servicio systemd",
+    regex: /systemctl|systemd|\.service.*\[Unit\]/,
+    explanation:
+      "Intenta crear un servicio del sistema para persistencia.",
+  },
+  {
+    id: "arbitrary-file-write",
+    severity: "critical",
+    confidence: "medium",
+    category: "system-execution",
+    description: "Escritura a ubicación del sistema",
+    regex: /writeFile(Sync)?\s*\(\s*['"\/]/,
+    explanation:
+      "Escribe archivos a rutas del sistema. Puede sobrescribir archivos críticos.",
+  },
+  {
+    id: "coin-mining-pools",
+    severity: "critical",
+    confidence: "high",
+    category: "malware",
+    description: "Conexión a pool de minería",
+    regex: /(stratum\+tcp|coinhive|cryptonight|hashrate|xmrig|miner)/,
+    explanation:
+      "Código de minería de criptomonedas conectando a pools remotos.",
+  },
+  {
+    id: "webassembly-miner",
+    severity: "critical",
+    confidence: "high",
+    category: "malware",
+    description: "Minero WebAssembly (CoinHive, etc)",
+    regex: /(coin hive|CoinHive|coinhive|authedmine|cryptoloot)/i,
+    explanation:
+      "Minero basado en WebAssembly en el navegador.",
+  },
+  {
+    id: "vm-detection",
+    severity: "medium",
+    confidence: "medium",
+    category: "obfuscation",
+    description: "Detección de entorno virtual",
+    regex: /(hyperv|vmware|virtualbox|parallels|qemu|xen|kvm).*platform|systemInformation.*hyperv/i,
+    explanation:
+      "Detecta si está corriendo en VM para evadir análisis.",
+  },
+  {
+    id: "timing-evasion",
+    severity: "low",
+    confidence: "low",
+    category: "obfuscation",
+    description: "Sleep o delay para evadir análisis",
+    regex: /setTimeout.*[0-9]{4,}|sleep\s*\([0-9]{4,}\)|while.*Date/,
+    explanation:
+      "Delay automático para evadir análisis dinámicos.",
+  },
+  {
+    id: "npmrc-access",
+    severity: "high",
+    confidence: "medium",
+    category: "credentials",
+    description: "Acceso a configuración de npm",
+    regex: /(\.npmrc|npmrc|~\/\.npm)/,
+    explanation:
+      "Accede a configuración de npm que puede contener tokens.",
+  },
+  {
+    id: "gitconfig-access",
+    severity: "high",
+    confidence: "medium",
+    category: "credentials",
+    description: "Acceso a configuración de Git",
+    regex: /(\.gitconfig|git config|~\/\.git)/,
+    explanation:
+      "Accede a configuración de Git que puede contener credenciales.",
+  },
+  {
+    id: "slack-discord-tokens",
+    severity: "high",
+    confidence: "high",
+    category: "credentials",
+    description: "Acceso a tokens de Slack/Discord",
+    regex: /process\.env\.(SLACK_|DISCORD_|WEBHOOK)/i,
+    explanation:
+      "Accede a tokens de integración de Slack o Discord.",
+  },
+  {
+    id: "hardcoded-ip",
+    severity: "high",
+    confidence: "medium",
+    category: "network",
+    description: "IP hardcodeada para conexión",
+    regex: /['"][0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}['"]/,
+    explanation:
+      "IP hardcodeada para comunicación. Común en malware para C2.",
+  },
+  {
+    id: "encoding-network",
+    severity: "medium",
+    confidence: "low",
+    category: "obfuscation",
+    description: "String codificado para red",
+    regex: /(encodeURI|encodeURIComponent|escape).*http/,
+    explanation:
+      "Codifica URLs para evadir detección de dominios maliciosos.",
+  },
+  {
+    id: "string-reverse",
+    severity: "low",
+    confidence: "low",
+    category: "obfuscation",
+    description: "String invertido para ofuscación",
+    regex: /\.split\s*\(\s*['"]["\s]*\)\s*\.\s*reverse\s*\(\s*\)\s*\.\s*join\s*\(\s*['"]["\s]*\s*\)/,
+    explanation:
+      "Invierte strings para evadir detección visual.",
+  },
+  {
+    id: "template-literal-obf",
+    severity: "low",
+    confidence: "low",
+    category: "obfuscation",
+    description: "Template literal con expresiones dinámicas",
+    regex: /`(?:(?!\$\{).)*\$\{[^}]+\}.*`/,
+    explanation:
+      "Usa template literals con expresiones para ofuscar código.",
+  },
+  {
+    id: "typosquat-suspicious",
+    severity: "medium",
+    confidence: "low",
+    category: "malware",
+    description: "Paquete con nombre similar a popular",
+    regex: /(lodash|moment|axios|express|react|vue|npm).*\-/,
+    explanation:
+      "Paquete con nombre similar a popular (typosquatting).",
   },
 ];
 
@@ -244,6 +458,7 @@ export const lifecycleScriptPatterns = [
   {
     id: "lifecycle-network",
     severity: "high",
+    confidence: "high",
     category: "network",
     description: "Descarga de red en script de lifecycle",
     regex: /(curl|wget|fetch|http\.get|https\.get)/,
@@ -253,6 +468,7 @@ export const lifecycleScriptPatterns = [
   {
     id: "lifecycle-exec",
     severity: "high",
+    confidence: "high",
     category: "system-execution",
     description: "Ejecución de comandos del sistema en lifecycle",
     regex: /(exec|execSync|spawn|child_process)/,
@@ -262,6 +478,7 @@ export const lifecycleScriptPatterns = [
   {
     id: "lifecycle-pipe-shell",
     severity: "high",
+    confidence: "high",
     category: "system-execution",
     description: "Pipe a shell en lifecycle",
     regex: /\|\s*(bash|sh|zsh|powershell)/,
@@ -270,6 +487,7 @@ export const lifecycleScriptPatterns = [
   {
     id: "lifecycle-env-access",
     severity: "medium",
+    confidence: "medium",
     category: "data-exfiltration",
     description: "Acceso a variables de entorno en lifecycle",
     regex: /process\.env\.[A-Z_]{3,}/,
