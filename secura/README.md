@@ -1,16 +1,53 @@
 # Secura 🔐
 
-Security scanner para proyectos Node.js con análisis de patrones sospechosos y soporte para IA local.
+Security scanner para proyectos Node.js con análisis de patrones sospechosos, sistema de scoring y soporte para IA local.
 
 ## Características
 
 - **Escaneo de package.json scripts** - Detecta patrones peligrosos en lifecycle scripts (preinstall, postinstall, etc.)
 - **Escaneo de código fuente** - Analiza archivos JS/TS en busca de patrones de malware
 - **Escaneo de node_modules** - Analiza archivos de entrada de paquetes instalados
+- **Sistema de Scoring** - Score basado en severity × confidence para priorizar hallazgos
+- **Reglas Compuestas** - Detecta combinaciones peligrosas de patrones (persistencia, exfiltración, etc.)
 - **Análisis con IA** - Integración con Groq API u Ollama local para análisis contextual de hallazgos
 - **Diagnóstico de entorno** - Analiza configuraciones de seguridad y .gitignore
 - **Hardening automático** - Aplica recomendaciones de seguridad con confirmación
 - **Exportación JSON** - Genera reportes en formato JSON
+
+## Sistema de Scoring
+
+Secura usa un sistema de scoring para priorizar hallazgos:
+
+### Severity × Confidence
+
+| Severity | Puntos | Confidence | Multiplicador |
+|----------|-------|------------|-------------|
+| critical | 10 | high | 1.5x |
+| high | 7 | medium | 1.0x |
+| medium | 3 | low | 0.5x |
+| low | 1 | - | - |
+
+**Score final** = severity × confidence
+
+### Niveles de Riesgo
+
+| Score | Nivel |
+|-------|-------|
+| 0-19 | LOW |
+| 20-49 | MEDIUM |
+| 50-99 | HIGH |
+| 100+ | CRITICAL |
+
+### Reglas Compuestas
+
+Secura detecta combinaciones peligrosas de patrones:
+
+| Regla |Señales | Bonus |
+|-------|--------|-------|
+| obfuscated-execution | base64-decode + eval | +15 |
+| env-exfiltration | process.env + fetch | +20 |
+| persistence-mechanism | bashrc + cron | +25 |
+| reverse-shell-setup | reverse-shell + exec | +20 |
 
 ## Instalación
 
@@ -171,25 +208,46 @@ secura/
 │   │   ├── scripts.js        # package.json + node_modules scripts
 │   │   └── files.js          # código fuente
 │   ├── patterns/
-│   │   └── index.js          # Biblioteca de patrones
+│   │   └── index.js          # Biblioteca de patrones + scoring
+│   ├── core/
+│   │   ├── scorer.js         # Motor de scoring
+│   │   └── composites.js   # Reglas compuestas
 │   ├── auditors/
 │   │   ├── environment.js    # Análisis de configuraciones
-│   │   └── gitignore.js      # Análisis de .gitignore
+│   │   └── gitignore.js    # Análisis de .gitignore
 │   ├── hardening/
-│   │   └── apply.js          # Aplicar recomendaciones
+│   │   └── apply.js        # Aplicar recomendaciones
 │   ├── mcp/
-│   │   ├── server.js         # Servidor MCP standalone
-│   │   ├── handler.js        # Manejador de comandos
-│   │   └── types.js          # Tipos MCP
+│   │   ├── server.js        # Servidor MCP standalone
+│   │   ├── handler.js     # Manejador de comandos
+│   │   └── types.js        # Tipos MCP
 │   ├── reporters/
-│   │   └── console.js        # Output formateado
+│   │   └── console.js      # Output formateado
 │   └── utils/
-│       └── ai.js             # Integración Groq/Ollama
+│       └── ai.js           # Integración Groq/Ollama
 ├── mcp-server.js             # Entry point para --mcp
 ├── package.json
+├── eslint.config.js         # Configuración ESLint
+├── patterns.test.js         # Tests
 └── README.md
 ```
 
 ## License
 
 MIT
+
+## Desarrollo
+
+```bash
+# Instalar dependencias
+bun install
+
+# Escanear proyecto
+bun src/index.js .
+
+# Tests
+bun test
+
+# Linting
+bun run lint
+```
