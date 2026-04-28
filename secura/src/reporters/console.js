@@ -144,6 +144,17 @@ export function printSummary(allFindings, duration, includeScore = true) {
     console.log(chalk.green.bold("\n  ✅ ¡Todo limpio!"))
   }
 
+  if (scored?.composites?.length > 0) {
+    console.log(chalk.cyan("\n▶ Patrones Compuestos"))
+    console.log(chalk.gray("─".repeat(60)))
+    for (const c of scored.composites) {
+      console.log(
+        `  ${chalk.red("⚠️")} ${chalk.red.bold(c.id)}: ${c.description}` +
+        chalk.gray(` (+${c.bonus} pts)`)
+      )
+    }
+  }
+
   console.log()
 
   return scored
@@ -166,9 +177,12 @@ export function exportJSON(allFindings, outputPath) {
     generatedAt: new Date().toISOString(),
     totalFindings: allFindings.length,
     score: scored.totalScore,
+    baseScore: scored.baseScore,
+    compositeScore: scored.compositeScore,
     riskLevel: scored.riskLevel,
     bySeverity: scored.bySeverity,
     byCategory: scored.byCategory,
+    composites: scored.composites,
     findings: allFindings,
   }
   writeFileSync(outputPath, JSON.stringify(report, null, 2))
