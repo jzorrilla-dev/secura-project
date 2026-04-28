@@ -131,7 +131,7 @@ describe("patterns", () => {
 
 describe("scanPackageJson", () => {
   test("detects malicious postinstall script", () => {
-    const findings = scanPackageJson("../test-project");
+    const findings = scanPackageJson("./examples/test-app");
     const postinstall = findings.filter((f) => f.script === "postinstall");
     expect(postinstall.length).toBeGreaterThan(0);
   });
@@ -144,7 +144,7 @@ describe("scanPackageJson", () => {
 
 describe("scanSourceCode", () => {
   test("detects malware in test project", () => {
-    const findings = scanSourceCode("../test-project");
+    const findings = scanSourceCode("./examples/test-app");
     const critical = findings.filter((f) => f.severity === "critical");
     expect(critical.length).toBeGreaterThan(0);
   });
@@ -155,7 +155,7 @@ describe("scanSourceCode", () => {
   });
 
   test("detects reverse shell", () => {
-    const findings = scanSourceCode("../test-project");
+    const findings = scanSourceCode("./examples/test-app");
     const reverseShell = findings.find((f) => f.patternId === "reverse-shell");
     expect(reverseShell).toBeDefined();
   });
